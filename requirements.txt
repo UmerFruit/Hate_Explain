@@ -1,0 +1,25 @@
+# Core ML/DL Libraries - Python 3.13 compatible
+torch>=2.1.0
+transformers>=4.36.0
+scipy>=1.11.0
+numpy>=1.26.0
+pandas>=2.1.0
+scikit-learn>=1.3.0
+
+# NLP Libraries
+spacy>=3.7.0
+gensim>=4.3.0
+ekphrasis>=0.5.4
+
+# Visualization
+matplotlib>=3.8.0
+
+# Utilities
+tqdm>=4.66.0
+lime>=0.2.0.1
+GPUtil>=1.4.0
+more-itertools>=10.0.0
+
+# Optional - uncomment if needed
+# neptune>=1.8.0
+# waiting>=1.4.1
