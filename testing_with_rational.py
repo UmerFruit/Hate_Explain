@@ -20,6 +20,7 @@ import time
 import os
 import GPUtil
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.utils import class_weight  # ← ADD THIS LINE TOO (for the class_weight.compute_class_weight call)
 import json
 from Models.bertModels import *
 from Models.otherModels import *
@@ -35,12 +36,6 @@ from lime.lime_text import LimeTextExplainer
 import numpy as np
 import argparse
 import GPUtil
-
-# In[3]:
-
-
-
-
 
 dict_data_folder={
       '2':{'data_file':'Data/dataset.json','class_label':'Data/classes_two.npy'},
@@ -90,9 +85,7 @@ def select_model(params,embeddings):
 
 
 def standaloneEval_with_rational(params, test_data=None,extra_data_path=None, topk=2,use_ext_df=False):
-#     device = torch.device("cpu")
     if torch.cuda.is_available() and params['device']=='cuda':    
-        # Tell PyTorch to use the GPU.    
         device = torch.device("cuda")
         deviceID = get_gpu(params)
         torch.cuda.set_device(deviceID[0])
@@ -100,8 +93,6 @@ def standaloneEval_with_rational(params, test_data=None,extra_data_path=None, to
         print('Since you dont want to use GPU, using the CPU instead.')
         device = torch.device("cpu")
 
-    
-    
     embeddings=None
     if(params['bert_tokens']):
         train,val,test=createDatasetSplit(params)
@@ -113,11 +104,18 @@ def standaloneEval_with_rational(params, test_data=None,extra_data_path=None, to
         params['embed_size']=vocab_own.embeddings.shape[1]
         params['vocab_size']=vocab_own.embeddings.shape[0]
         embeddings=vocab_own.embeddings
+    
     if(params['auto_weights']):
         y_test = [ele[2] for ele in test] 
         encoder = LabelEncoder()
         encoder.classes_ = np.load('Data/classes.npy')
-        params['weights']=class_weight.compute_class_weight('balanced',np.unique(y_test),y_test).astype('float32')
+        # FIX: Use keyword arguments instead of positional
+        params['weights'] = compute_class_weight(
+            class_weight='balanced',
+            classes=np.unique(y_test),
+            y=y_test
+        ).astype('float32')
+    
     if(extra_data_path!=None):
         params_dash={}
         params_dash['num_classes']=3
@@ -135,6 +133,7 @@ def standaloneEval_with_rational(params, test_data=None,extra_data_path=None, to
         test_dataloader=combine_features(test_extra,params,is_train=False)
     else:
         test_dataloader=combine_features(test,params,is_train=False)
+
     
     
     
@@ -265,10 +264,6 @@ def standaloneEval_with_rational(params, test_data=None,extra_data_path=None, to
         
     return list_dict,test_data
 
-
-# In[115]:
-
-
 def get_final_dict_with_rational(params,test_data=None,topk=5):
     list_dict_org,test_data=standaloneEval_with_rational(params, extra_data_path=test_data,topk=topk)
     test_data_with_rational=convert_data(test_data,params,list_dict_org,rational_present=True,topk=topk)
@@ -282,23 +277,14 @@ def get_final_dict_with_rational(params,test_data=None,topk=5):
         final_list_dict.append(ele1)
     return final_list_dict
 
-# In[ ]:
-
-
-
-# In[88]:
-
 class NumpyEncoder(json.JSONEncoder):
     """ Special json encoder for numpy types """
     def default(self, obj):
-        if isinstance(obj, (np.int_, np.intc, np.intp, np.int8,
-            np.int16, np.int32, np.int64, np.uint8,
-            np.uint16, np.uint32, np.uint64)):
+        if isinstance(obj, np.integer):
             return int(obj)
-        elif isinstance(obj, (np.float_, np.float16, np.float32, 
-            np.float64)):
+        elif isinstance(obj, np.floating):
             return float(obj)
-        elif isinstance(obj,(np.ndarray,)): #### This is the fix
+        elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
 
@@ -332,7 +318,6 @@ if __name__=='__main__':
     
     params['variance']=1
     params['num_classes']=3
-    params['device']='cpu'
     fix_the_random(seed_val = params['random_seed'])
     params['class_names']=dict_data_folder[str(params['num_classes'])]['class_label']
     params['data_file']=dict_data_folder[str(params['num_classes'])]['data_file']
@@ -346,6 +331,3 @@ if __name__=='__main__':
     path_name_explanation='explanations_dicts/'+path_name.split('/')[1].split('.')[0]+'_'+str(params['att_lambda'])+'_explanation_top5.json'
     with open(path_name_explanation, 'w') as fp:
         fp.write('\n'.join(json.dumps(i,cls=NumpyEncoder) for i in final_list_dict))
-
-# In[ ]:
-
